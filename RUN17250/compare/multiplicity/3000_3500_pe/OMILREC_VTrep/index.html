@@ -94,15 +94,32 @@
         }
         .plot-links {
             padding: 10px 16px;
-            border-top: 1px solid #f1f5f9;
+            border-top: 1px solid #e2e8f0;
             font-size: 0.85rem;
-            background: #fafafa;
-            text-align: right;
+            background: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .plot-links a {
             color: #2563eb;
             text-decoration: none;
             font-weight: 600;
+        }
+        .btn-interactive {
+            background: #2563eb;
+            color: #ffffff !important;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.15s ease-in-out;
+        }
+        .btn-interactive:hover {
+            background: #1d4ed8;
         }
     </style>
 </head>
@@ -124,7 +141,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_Noflashers.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_Noflashers.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_Noflashers.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
@@ -137,7 +155,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_Noflashers_Nomuons.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_Noflashers_Nomuons.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_Noflashers_Nomuons.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
@@ -150,7 +169,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_Nomuons.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_Nomuons.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_Nomuons.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
@@ -163,7 +183,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_all.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_all.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_all.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
@@ -176,7 +197,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_flashers.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_flashers.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_flashers.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
@@ -189,7 +211,8 @@
                     </a>
                 </div>
                 <div class="plot-links">
-                    <a href="comparison_muons.png" target="_blank">🔍 Apri a dimensione intera</a>
+                    <a href="comparison_muons.png" target="_blank">🔍 PNG Intera</a>
+                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=comparison_muons.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
                 </div>
             </div>
             
