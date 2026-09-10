@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2500_3000_pe</title>
+    <!-- Caricamento JSROOT ufficiale -->
+    <script src="https://root.cern/js/latest/scripts/JSRoot.core.js" type="text/javascript"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -116,10 +118,54 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            transition: background 0.15s ease-in-out;
+            cursor: pointer;
+            border: none;
+            font-size: 0.85rem;
         }
         .btn-interactive:hover {
             background: #1d4ed8;
+        }
+
+        /* Modal per visualizzatore interattivo */
+        #modal-viewer {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        #modal-box {
+            width: 90vw; height: 88vh;
+            background: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        #modal-header {
+            padding: 12px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #modal-close {
+            cursor: pointer;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #64748b;
+            border: none;
+            background: transparent;
+        }
+        #jsroot-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
@@ -142,7 +188,7 @@
                 </div>
                 <div class="plot-links">
                     <a href="radial_distribution.png" target="_blank">🔍 PNG Intera</a>
-                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=radial_distribution.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
+                    <button class="btn-interactive" onclick="openInteractive('radial_distribution.root')">⚡ Apri interattivo</button>
                 </div>
             </div>
             
@@ -156,10 +202,58 @@
                 </div>
                 <div class="plot-links">
                     <a href="spatial_distribution.png" target="_blank">🔍 PNG Intera</a>
-                    <a class="btn-interactive" href="https://root.cern/js/latest/?file=spatial_distribution.root" target="_blank">⚡ Apri interattivo (JSROOT)</a>
+                    <button class="btn-interactive" onclick="openInteractive('spatial_distribution.root')">⚡ Apri interattivo</button>
                 </div>
             </div>
             
     </div>
+
+    <!-- Modale JSROOT -->
+    <div id="modal-viewer">
+        <div id="modal-box">
+            <div id="modal-header">
+                <span id="modal-title" style="font-weight:600; color:#334155;">Plot Interattivo</span>
+                <button id="modal-close" onclick="closeViewer()">&times;</button>
+            </div>
+            <div id="jsroot-container"></div>
+        </div>
+    </div>
+
+    <script>
+        function openInteractive(rootFileName) {
+            const modal = document.getElementById("modal-viewer");
+            const container = document.getElementById("jsroot-container");
+            document.getElementById("modal-title").innerText = rootFileName;
+            modal.style.display = "flex";
+            container.innerHTML = "<p style='padding:20px;'>Caricamento canvas in corso...</p>";
+
+            // JSROOT apre il file relativo al path corrente
+            JSROOT.openFile(rootFileName)
+                .then(file => {
+                    // Prende il primo oggetto (la TCanvas) e lo disegna
+                    return file.readObject(file.fKeys[0].fName);
+                })
+                .then(obj => {
+                    container.innerHTML = "";
+                    JSROOT.draw("jsroot-container", obj, "");
+                })
+                .catch(err => {
+                    container.innerHTML = "<p style='color:red; padding:20px;'>Errore nel caricamento del file ROOT: " + err + "</p>";
+                });
+        }
+
+        function closeViewer() {
+            document.getElementById("modal-viewer").style.display = "none";
+            document.getElementById("jsroot-container").innerHTML = "";
+        }
+
+        // Chiude la finestra se si preme ESC o clicca fuori
+        window.onclick = function(e) {
+            if (e.target == document.getElementById("modal-viewer")) closeViewer();
+        };
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") closeViewer();
+        });
+    </script>
 </body>
 </html>
