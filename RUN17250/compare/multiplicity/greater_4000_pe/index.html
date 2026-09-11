@@ -58,7 +58,6 @@
             border-color: #94a3b8;
             transform: translateY(-1px);
         }
-        /* Layout griglia dinamico: default vs compare/multiplicity */
         .plot-grid {
             display: grid;
             gap: 24px;
@@ -138,7 +137,7 @@
             align-items: center;
         }
         #modal-box {
-            width: 92vw; height: 90vh;
+            width: 95vw; height: 92vh;
             background: #ffffff;
             border-radius: 8px;
             display: flex;
@@ -208,39 +207,53 @@
                     container.innerHTML = "";
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
-                .then(mainPainter => {
-                    // Sincronizzazione automatica asse X tra pad superiore e pad inferiore (residui)
+                .then(canvasPainter => {
+                    // Collegamento bi-direzionale tra Pad Superiore e Pad Inferiore (Residui)
+                    let isSyncing = false;
+
+                    function syncPads(sourcePad, targetPad) {
+                        if (isSyncing || !sourcePad || !targetPad) return;
+                        const srcFrame = sourcePad.getFramePainter();
+                        const tgtFrame = targetPad.getFramePainter();
+                        if (!srcFrame || !tgtFrame) return;
+
+                        // Se i range differiscono, applica lo zoom sul target
+                        if (tgtFrame.zoom_xmin !== srcFrame.zoom_xmin || tgtFrame.zoom_xmax !== srcFrame.zoom_xmax) {
+                            isSyncing = true;
+                            tgtFrame.zoom(srcFrame.zoom_xmin, srcFrame.zoom_xmax, 0, 0, 0, 0);
+                            setTimeout(() => { isSyncing = false; }, 50);
+                        }
+                    }
+
                     for (let r = 0; r < 3; ++r) {
-                        const pTop = mainPainter.findPainterFor(null, "pad_top_" + r);
-                        const pBot = mainPainter.findPainterFor(null, "pad_bot_" + r);
+                        const pTop = canvasPainter.findPainterFor(null, "pad_top_" + r);
+                        const pBot = canvasPainter.findPainterFor(null, "pad_bot_" + r);
 
                         if (pTop && pBot) {
-                            let syncing = false;
-
-                            const frameBot = pBot.getFramePainter();
-                            if (frameBot && typeof frameBot.addPadListener === "function") {
-                                frameBot.addPadListener(function(event) {
-                                    if (syncing || !event || event.action !== "zoom") return;
-                                    const frameTop = pTop.getFramePainter();
-                                    if (frameTop && (frameTop.zoom_xmin !== frameBot.zoom_xmin || frameTop.zoom_xmax !== frameBot.zoom_xmax)) {
-                                        syncing = true;
-                                        frameTop.zoom(frameBot.zoom_xmin, frameBot.zoom_xmax, 0, 0, 0, 0);
-                                        syncing = false;
-                                    }
-                                });
+                            // Controllo tramite polling/interazione pad
+                            if (typeof canvasPainter.registerForPadEvents === "function") {
+                                canvasPainter.registerForPadEvents(pBot);
+                                canvasPainter.registerForPadEvents(pTop);
                             }
 
-                            const frameTop = pTop.getFramePainter();
-                            if (frameTop && typeof frameTop.addPadListener === "function") {
-                                frameTop.addPadListener(function(event) {
-                                    if (syncing || !event || event.action !== "zoom") return;
-                                    const frameBot = pBot.getFramePainter();
-                                    if (frameBot && (frameBot.zoom_xmin !== frameTop.zoom_xmin || frameBot.zoom_xmax !== frameTop.zoom_xmax)) {
-                                        syncing = true;
-                                        frameBot.zoom(frameTop.zoom_xmin, frameTop.zoom_xmax, 0, 0, 0, 0);
-                                        syncing = false;
-                                    }
-                                });
+                            // Intercetta ridimensionamenti sul frame inferiore
+                            const fBot = pBot.getFramePainter();
+                            if (fBot) {
+                                const origRedrawBot = fBot.redraw;
+                                fBot.redraw = function(...args) {
+                                    origRedrawBot.apply(this, args);
+                                    syncPads(pBot, pTop);
+                                };
+                            }
+
+                            // Intercetta ridimensionamenti sul frame superiore
+                            const fTop = pTop.getFramePainter();
+                            if (fTop) {
+                                const origRedrawTop = fTop.redraw;
+                                fTop.redraw = function(...args) {
+                                    origRedrawTop.apply(this, args);
+                                    syncPads(pTop, pBot);
+                                };
                             }
                         }
                     }
