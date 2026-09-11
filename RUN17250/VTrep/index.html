@@ -58,7 +58,7 @@
             border-color: #94a3b8;
             transform: translateY(-1px);
         }
-        /* Layout griglia dinamico: default vs compare_multiplicity */
+        /* Layout griglia dinamico: default vs compare/multiplicity */
         .plot-grid {
             display: grid;
             gap: 24px;
@@ -208,25 +208,40 @@
                     container.innerHTML = "";
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
-                .then(painter => {
-                    // Sincronizzazione automatica asse X tra pad superiore e inferiore
+                .then(mainPainter => {
+                    // Sincronizzazione automatica asse X tra pad superiore e pad inferiore (residui)
                     for (let r = 0; r < 3; ++r) {
-                        const padTop = painter.findPainterFor(null, "pad_top_" + r);
-                        const padBot = painter.findPainterFor(null, "pad_bot_" + r);
+                        const pTop = mainPainter.findPainterFor(null, "pad_top_" + r);
+                        const pBot = mainPainter.findPainterFor(null, "pad_bot_" + r);
 
-                        if (padTop && padBot) {
-                            // Quando si zooma o resetta il pad inferiore (residui), sincronizza il top
-                            padBot.addCallback("user_zoom", function(subp) {
-                                const xmin = padBot.getFramePainter().x_min;
-                                const xmax = padBot.getFramePainter().x_max;
-                                padTop.getFramePainter().zoom(xmin, xmax);
-                            });
-                            // Quando si zooma il top, sincronizza l'inferiore
-                            padTop.addCallback("user_zoom", function(subp) {
-                                const xmin = padTop.getFramePainter().x_min;
-                                const xmax = padTop.getFramePainter().x_max;
-                                padBot.getFramePainter().zoom(xmin, xmax);
-                            });
+                        if (pTop && pBot) {
+                            let syncing = false;
+
+                            const frameBot = pBot.getFramePainter();
+                            if (frameBot && typeof frameBot.addPadListener === "function") {
+                                frameBot.addPadListener(function(event) {
+                                    if (syncing || !event || event.action !== "zoom") return;
+                                    const frameTop = pTop.getFramePainter();
+                                    if (frameTop && (frameTop.zoom_xmin !== frameBot.zoom_xmin || frameTop.zoom_xmax !== frameBot.zoom_xmax)) {
+                                        syncing = true;
+                                        frameTop.zoom(frameBot.zoom_xmin, frameBot.zoom_xmax, 0, 0, 0, 0);
+                                        syncing = false;
+                                    }
+                                });
+                            }
+
+                            const frameTop = pTop.getFramePainter();
+                            if (frameTop && typeof frameTop.addPadListener === "function") {
+                                frameTop.addPadListener(function(event) {
+                                    if (syncing || !event || event.action !== "zoom") return;
+                                    const frameBot = pBot.getFramePainter();
+                                    if (frameBot && (frameBot.zoom_xmin !== frameTop.zoom_xmin || frameBot.zoom_xmax !== frameTop.zoom_xmax)) {
+                                        syncing = true;
+                                        frameBot.zoom(frameTop.zoom_xmin, frameTop.zoom_xmax, 0, 0, 0, 0);
+                                        syncing = false;
+                                    }
+                                });
+                            }
                         }
                     }
                 })
