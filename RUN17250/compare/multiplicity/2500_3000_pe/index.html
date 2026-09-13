@@ -208,21 +208,55 @@
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
                 .then(canvasPainter => {
-                    // Applica il clip-path specifico di ciascun pad a tutte le sue primitive (linee, griglie, funzioni)
-                    const applyPadClipping = () => {
-                        const padElements = container.querySelectorAll("svg g.root_pad");
-                        padElements.forEach(padElem => {
-                            const clipPath = padElem.querySelector("clipPath");
-                            if (clipPath && clipPath.id) {
-                                const clipUrl = "url(#" + clipPath.id + ")";
-                                padElem.querySelectorAll("g.primitives_layer, g.draw_layer").forEach(layer => {
-                                    layer.setAttribute("clip-path", clipUrl);
+                    // Intercetta tutti i pad disegnati e applica il clipping automatico del frame alle linee/primitive
+                    function enforceFrameClipping() {
+                        if (!canvasPainter) return;
+                        
+                        // Per ogni pad del canvas (principale o sottomodulo)
+                        const pads = canvasPainter.pads || (canvasPainter.getSubPadPainters ? canvasPainter.getSubPadPainters() : []);
+                        
+                        pads.forEach(p => {
+                            const fp = p.getFramePainter ? p.getFramePainter() : null;
+                            if (!fp || !fp.getFrameNode) return;
+                            
+                            const frameNode = fp.getFrameNode();
+                            if (!frameNode) return;
+                            
+                            // Cerca o genera un clipPath SVG basato sul rettangolo esatto del frame
+                            const svg = frameNode.ownerSVGElement;
+                            if (!svg) return;
+                            
+                            let defs = svg.querySelector("defs");
+                            if (!defs) {
+                                defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                                svg.insertBefore(defs, svg.firstChild);
+                            }
+                            
+                            const clipId = "clip_pad_" + Math.random().toString(36).substring(2, 9);
+                            const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+                            clipPath.setAttribute("id", clipId);
+                            
+                            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            rect.setAttribute("x", fp.getFrameX ? fp.getFrameX() : 0);
+                            rect.setAttribute("y", fp.getFrameY ? fp.getFrameY() : 0);
+                            rect.setAttribute("width", fp.getFrameWidth ? fp.getFrameWidth() : "100%");
+                            rect.setAttribute("height", fp.getFrameHeight ? fp.getFrameHeight() : "100%");
+                            
+                            clipPath.appendChild(rect);
+                            defs.appendChild(clipPath);
+                            
+                            // Applica il clip al layer che ospita le TLine, TGraph, ecc.
+                            const padNode = p.getPadNode ? p.getPadNode() : null;
+                            if (padNode) {
+                                const prims = padNode.querySelectorAll(".primitives_layer, .main_layer, .draw_layer");
+                                prims.forEach(layer => {
+                                    layer.setAttribute("clip-path", "url(#" + clipId + ")");
                                 });
                             }
                         });
-                    };
+                    }
 
-                    applyPadClipping();
+                    enforceFrameClipping();
 
                     let isUpdating = false;
 
@@ -243,23 +277,29 @@
                                 target.zoom(sMin, sMax);
                                 setTimeout(() => { 
                                     isUpdating = false; 
-                                    applyPadClipping();
+                                    enforceFrameClipping();
                                 }, 60);
                             }
                         };
 
                         if (pBot.addPadModifiedListener) {
-                            pBot.addPadModifiedListener(() => sync(fBot, fTop));
+                            pBot.addPadModifiedListener(() => {
+                                sync(fBot, fTop);
+                                enforceFrameClipping();
+                            });
                         }
                         if (pTop.addPadModifiedListener) {
-                            pTop.addPadModifiedListener(() => sync(fTop, fBot));
+                            pTop.addPadModifiedListener(() => {
+                                sync(fTop, fBot);
+                                enforceFrameClipping();
+                            });
                         }
 
                         const origZoomBot = fBot.zoom.bind(fBot);
                         fBot.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
                             const res = origZoomBot(xmin, xmax, ymin, ymax, zmin, zmax);
                             sync(fBot, fTop);
-                            applyPadClipping();
+                            enforceFrameClipping();
                             return res;
                         };
 
@@ -267,7 +307,7 @@
                         fTop.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
                             const res = origZoomTop(xmin, xmax, ymin, ymax, zmin, zmax);
                             sync(fTop, fBot);
-                            applyPadClipping();
+                            enforceFrameClipping();
                             return res;
                         };
                     }
