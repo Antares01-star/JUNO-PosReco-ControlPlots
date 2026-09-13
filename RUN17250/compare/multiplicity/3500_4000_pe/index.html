@@ -208,19 +208,21 @@
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
                 .then(canvasPainter => {
-                    // Collegamento bi-direzionale tra Pad Superiore e Pad Inferiore (Residui)
                     let isSyncing = false;
 
-                    function syncPads(sourcePad, targetPad) {
-                        if (isSyncing || !sourcePad || !targetPad) return;
-                        const srcFrame = sourcePad.getFramePainter();
-                        const tgtFrame = targetPad.getFramePainter();
-                        if (!srcFrame || !tgtFrame) return;
+                    function syncPads(sourceFrame, targetFrame) {
+                        if (isSyncing || !sourceFrame || !targetFrame) return;
 
-                        // Se i range differiscono, applica lo zoom sul target
-                        if (tgtFrame.zoom_xmin !== srcFrame.zoom_xmin || tgtFrame.zoom_xmax !== srcFrame.zoom_xmax) {
+                        const s_xmin = (typeof sourceFrame.zoom_xmin !== "undefined") ? sourceFrame.zoom_xmin : sourceFrame.scale_xmin;
+                        const s_xmax = (typeof sourceFrame.zoom_xmax !== "undefined") ? sourceFrame.zoom_xmax : sourceFrame.scale_xmax;
+                        const t_xmin = (typeof targetFrame.zoom_xmin !== "undefined") ? targetFrame.zoom_xmin : targetFrame.scale_xmin;
+                        const t_xmax = (typeof targetFrame.zoom_xmax !== "undefined") ? targetFrame.zoom_xmax : targetFrame.scale_xmax;
+
+                        if (s_xmin !== t_xmin || s_xmax !== t_xmax) {
                             isSyncing = true;
-                            tgtFrame.zoom(srcFrame.zoom_xmin, srcFrame.zoom_xmax, 0, 0, 0, 0);
+                            if (typeof targetFrame.zoom === "function") {
+                                targetFrame.zoom(s_xmin, s_xmax);
+                            }
                             setTimeout(() => { isSyncing = false; }, 50);
                         }
                     }
@@ -229,30 +231,29 @@
                         const pTop = canvasPainter.findPainterFor(null, "pad_top_" + r);
                         const pBot = canvasPainter.findPainterFor(null, "pad_bot_" + r);
 
-                        if (pTop && pBot) {
-                            // Controllo tramite polling/interazione pad
-                            if (typeof canvasPainter.registerForPadEvents === "function") {
-                                canvasPainter.registerForPadEvents(pBot);
-                                canvasPainter.registerForPadEvents(pTop);
-                            }
+                        if (!pTop || !pBot) continue;
 
-                            // Intercetta ridimensionamenti sul frame inferiore
-                            const fBot = pBot.getFramePainter();
-                            if (fBot) {
-                                const origRedrawBot = fBot.redraw;
+                        const fTop = pTop.getFramePainter();
+                        const fBot = pBot.getFramePainter();
+
+                        if (fTop && fBot) {
+                            if (typeof fBot.addZoomHandler === "function") {
+                                fBot.addZoomHandler(() => syncPads(fBot, fTop));
+                            } else {
+                                const oldRedrawBot = fBot.redraw;
                                 fBot.redraw = function(...args) {
-                                    origRedrawBot.apply(this, args);
-                                    syncPads(pBot, pTop);
+                                    oldRedrawBot.apply(this, args);
+                                    syncPads(fBot, fTop);
                                 };
                             }
 
-                            // Intercetta ridimensionamenti sul frame superiore
-                            const fTop = pTop.getFramePainter();
-                            if (fTop) {
-                                const origRedrawTop = fTop.redraw;
+                            if (typeof fTop.addZoomHandler === "function") {
+                                fTop.addZoomHandler(() => syncPads(fTop, fBot));
+                            } else {
+                                const oldRedrawTop = fTop.redraw;
                                 fTop.redraw = function(...args) {
-                                    origRedrawTop.apply(this, args);
-                                    syncPads(pTop, pBot);
+                                    oldRedrawTop.apply(this, args);
+                                    syncPads(fTop, fBot);
                                 };
                             }
                         }
