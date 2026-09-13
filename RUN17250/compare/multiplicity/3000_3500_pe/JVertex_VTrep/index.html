@@ -288,55 +288,44 @@
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
                 .then(canvasPainter => {
-                    let isUpdating = false;
+                    let isSyncing = false;
 
-                    function bindPads(pTop, pBot) {
-                        const fTop = pTop ? pTop.getFramePainter() : null;
-                        const fBot = pBot ? pBot.getFramePainter() : null;
-                        if (!fTop || !fBot) return;
+                    for (let r = 0; r < 3; ++r) {
+                        const pTop = canvasPainter.findPainterFor(null, "pad_top_" + r);
+                        const pBot = canvasPainter.findPainterFor(null, "pad_bot_" + r);
+                        if (!pTop || !pBot) continue;
 
-                        const sync = (source, target) => {
-                            if (isUpdating) return;
+                        const fTop = pTop.getFramePainter();
+                        const fBot = pBot.getFramePainter();
+                        if (!fTop || !fBot) continue;
+
+                        const syncPads = (source, target) => {
+                            if (isSyncing) return;
                             const sMin = (source.zoom_xmin !== undefined) ? source.zoom_xmin : source.scale_xmin;
                             const sMax = (source.zoom_xmax !== undefined) ? source.zoom_xmax : source.scale_xmax;
                             const tMin = (target.zoom_xmin !== undefined) ? target.zoom_xmin : target.scale_xmin;
                             const tMax = (target.zoom_xmax !== undefined) ? target.zoom_xmax : target.scale_xmax;
 
                             if (Math.abs(sMin - tMin) > 1e-4 || Math.abs(sMax - tMax) > 1e-4) {
-                                isUpdating = true;
+                                isSyncing = true;
                                 target.zoom(sMin, sMax);
-                                setTimeout(() => { isUpdating = false; }, 60);
+                                setTimeout(() => { isSyncing = false; }, 50);
                             }
                         };
 
-                        if (pBot.addPadModifiedListener) {
-                            pBot.addPadModifiedListener(() => sync(fBot, fTop));
-                        }
-                        if (pTop.addPadModifiedListener) {
-                            pTop.addPadModifiedListener(() => sync(fTop, fBot));
-                        }
-
-                        const origZoomBot = fBot.zoom.bind(fBot);
-                        fBot.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
-                            const res = origZoomBot(xmin, xmax, ymin, ymax, zmin, zmax);
-                            sync(fBot, fTop);
+                        const oldZoomTop = fTop.zoom.bind(fTop);
+                        fTop.zoom = function(...args) {
+                            const res = oldZoomTop(...args);
+                            syncPads(fTop, fBot);
                             return res;
                         };
 
-                        const origZoomTop = fTop.zoom.bind(fTop);
-                        fTop.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
-                            const res = origZoomTop(xmin, xmax, ymin, ymax, zmin, zmax);
-                            sync(fTop, fBot);
+                        const oldZoomBot = fBot.zoom.bind(fBot);
+                        fBot.zoom = function(...args) {
+                            const res = oldZoomBot(...args);
+                            syncPads(fBot, fTop);
                             return res;
                         };
-                    }
-
-                    for (let r = 0; r < 3; ++r) {
-                        const pTop = canvasPainter.findPainterFor(null, "pad_top_" + r);
-                        const pBot = canvasPainter.findPainterFor(null, "pad_bot_" + r);
-                        if (pTop && pBot) {
-                            bindPads(pTop, pBot);
-                        }
                     }
                 })
                 .catch(err => {
