@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMILREC_VTrep</title>
-    <!-- Caricamento JSROOT ufficiale -->
+    <!-- Script moderno JSROOT per supporto completo eventi e canvas complessi -->
     <script src="https://root.cern/js/latest/scripts/JSRoot.core.js" type="text/javascript"></script>
     <style>
         body {
@@ -288,54 +288,56 @@
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
                 .then(canvasPainter => {
-                    let isSyncing = false;
+                    let isUpdating = false;
 
-                    function syncPads(sourceFrame, targetFrame) {
-                        if (isSyncing || !sourceFrame || !targetFrame) return;
+                    function bindPads(pTop, pBot) {
+                        const fTop = pTop ? pTop.getFramePainter() : null;
+                        const fBot = pBot ? pBot.getFramePainter() : null;
+                        if (!fTop || !fBot) return;
 
-                        const s_xmin = (typeof sourceFrame.zoom_xmin !== "undefined") ? sourceFrame.zoom_xmin : sourceFrame.scale_xmin;
-                        const s_xmax = (typeof sourceFrame.zoom_xmax !== "undefined") ? sourceFrame.zoom_xmax : sourceFrame.scale_xmax;
-                        const t_xmin = (typeof targetFrame.zoom_xmin !== "undefined") ? targetFrame.zoom_xmin : targetFrame.scale_xmin;
-                        const t_xmax = (typeof targetFrame.zoom_xmax !== "undefined") ? targetFrame.zoom_xmax : targetFrame.scale_xmax;
+                        // Monitora periodicamente o all'evento la sincronia degli assi
+                        const sync = (source, target) => {
+                            if (isUpdating) return;
+                            const sMin = (source.zoom_xmin !== undefined) ? source.zoom_xmin : source.scale_xmin;
+                            const sMax = (source.zoom_xmax !== undefined) ? source.zoom_xmax : source.scale_xmax;
+                            const tMin = (target.zoom_xmin !== undefined) ? target.zoom_xmin : target.scale_xmin;
+                            const tMax = (target.zoom_xmax !== undefined) ? target.zoom_xmax : target.scale_xmax;
 
-                        if (s_xmin !== t_xmin || s_xmax !== t_xmax) {
-                            isSyncing = true;
-                            if (typeof targetFrame.zoom === "function") {
-                                targetFrame.zoom(s_xmin, s_xmax);
+                            if (Math.abs(sMin - tMin) > 1e-4 || Math.abs(sMax - tMax) > 1e-4) {
+                                isUpdating = true;
+                                target.zoom(sMin, sMax);
+                                setTimeout(() => { isUpdating = false; }, 60);
                             }
-                            setTimeout(() => { isSyncing = false; }, 50);
+                        };
+
+                        // Aggancia listener con fallback sia a addPadModifiedListener che alla funzione zoom
+                        if (pBot.addPadModifiedListener) {
+                            pBot.addPadModifiedListener(() => sync(fBot, fTop));
                         }
+                        if (pTop.addPadModifiedListener) {
+                            pTop.addPadModifiedListener(() => sync(fTop, fBot));
+                        }
+
+                        const origZoomBot = fBot.zoom.bind(fBot);
+                        fBot.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
+                            const res = origZoomBot(xmin, xmax, ymin, ymax, zmin, zmax);
+                            sync(fBot, fTop);
+                            return res;
+                        };
+
+                        const origZoomTop = fTop.zoom.bind(fTop);
+                        fTop.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
+                            const res = origZoomTop(xmin, xmax, ymin, ymax, zmin, zmax);
+                            sync(fTop, fBot);
+                            return res;
+                        };
                     }
 
                     for (let r = 0; r < 3; ++r) {
                         const pTop = canvasPainter.findPainterFor(null, "pad_top_" + r);
                         const pBot = canvasPainter.findPainterFor(null, "pad_bot_" + r);
-
-                        if (!pTop || !pBot) continue;
-
-                        const fTop = pTop.getFramePainter();
-                        const fBot = pBot.getFramePainter();
-
-                        if (fTop && fBot) {
-                            if (typeof fBot.addZoomHandler === "function") {
-                                fBot.addZoomHandler(() => syncPads(fBot, fTop));
-                            } else {
-                                const oldRedrawBot = fBot.redraw;
-                                fBot.redraw = function(...args) {
-                                    oldRedrawBot.apply(this, args);
-                                    syncPads(fBot, fTop);
-                                };
-                            }
-
-                            if (typeof fTop.addZoomHandler === "function") {
-                                fTop.addZoomHandler(() => syncPads(fTop, fBot));
-                            } else {
-                                const oldRedrawTop = fTop.redraw;
-                                fTop.redraw = function(...args) {
-                                    oldRedrawTop.apply(this, args);
-                                    syncPads(fTop, fBot);
-                                };
-                            }
+                        if (pTop && pBot) {
+                            bindPads(pTop, pBot);
                         }
                     }
                 })
