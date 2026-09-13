@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>1000_1500_pe</title>
-    <!-- Script moderno JSROOT per supporto completo eventi e canvas complessi -->
+    <!-- Caricamento JSROOT ufficiale -->
     <script src="https://root.cern/js/latest/scripts/JSRoot.core.js" type="text/javascript"></script>
     <style>
         body {
@@ -208,6 +208,24 @@
                     return JSROOT.draw("jsroot-container", obj, "");
                 })
                 .then(canvasPainter => {
+                    // Forza il clipping SVG su tutti i frame per evitare che TLine o TGraph sbordino quando si fa zoom
+                    const applyClipping = () => {
+                        const svgs = container.querySelectorAll("svg");
+                        svgs.forEach(svg => {
+                            const frames = svg.querySelectorAll(".root_frame");
+                            frames.forEach(f => {
+                                f.style.overflow = "hidden";
+                            });
+                            // Applica clip-path su tutti i gruppi che disegnano primitive all'interno del frame
+                            const primitives = svg.querySelectorAll("g.primitives_layer");
+                            primitives.forEach(p => {
+                                p.style.overflow = "hidden";
+                            });
+                        });
+                    };
+
+                    applyClipping();
+
                     let isUpdating = false;
 
                     function bindPads(pTop, pBot) {
@@ -215,7 +233,6 @@
                         const fBot = pBot ? pBot.getFramePainter() : null;
                         if (!fTop || !fBot) return;
 
-                        // Monitora periodicamente o all'evento la sincronia degli assi
                         const sync = (source, target) => {
                             if (isUpdating) return;
                             const sMin = (source.zoom_xmin !== undefined) ? source.zoom_xmin : source.scale_xmin;
@@ -226,11 +243,13 @@
                             if (Math.abs(sMin - tMin) > 1e-4 || Math.abs(sMax - tMax) > 1e-4) {
                                 isUpdating = true;
                                 target.zoom(sMin, sMax);
-                                setTimeout(() => { isUpdating = false; }, 60);
+                                setTimeout(() => { 
+                                    isUpdating = false; 
+                                    applyClipping();
+                                }, 60);
                             }
                         };
 
-                        // Aggancia listener con fallback sia a addPadModifiedListener che alla funzione zoom
                         if (pBot.addPadModifiedListener) {
                             pBot.addPadModifiedListener(() => sync(fBot, fTop));
                         }
@@ -242,6 +261,7 @@
                         fBot.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
                             const res = origZoomBot(xmin, xmax, ymin, ymax, zmin, zmax);
                             sync(fBot, fTop);
+                            applyClipping();
                             return res;
                         };
 
@@ -249,6 +269,7 @@
                         fTop.zoom = function(xmin, xmax, ymin, ymax, zmin, zmax) {
                             const res = origZoomTop(xmin, xmax, ymin, ymax, zmin, zmax);
                             sync(fTop, fBot);
+                            applyClipping();
                             return res;
                         };
                     }
